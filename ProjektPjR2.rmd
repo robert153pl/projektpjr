@@ -1,0 +1,226 @@
+---
+title: "Analiza danych Daily Show Guests"
+date: 16.06.2021
+author: Wojciech Brol, Robert Zamiar
+output: 
+  html_document:
+    toc: true
+   
+    toc_float:
+      collapsed: false
+      
+   
+
+
+code_folding: hide
+eval: FALSE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(shiny)
+library(dplyr)
+library(fivethirtyeight)
+library(lubridate)
+library(ggplot2)
+
+daily_show_guests %>% mutate(miesiac=month(ymd(show))) %>% group_by(miesiac) %>% summarize(liczba=n())->miesiace
+
+miesiace$miesiac<-as.factor(c("Styczen","Luty","Marzec","Kwiecien","Maj","Czerwiec","Lipiec","Sierpien","Wrzesien","Pazdziernik","Listopad","Grudzien"))
+
+daily_show_guests %>% filter(group=="Musician",google_knowledge_occupation=="rapper") %>% slice(which.min(show),which.max(show))->rap
+
+c("Rok emisji","Zawód(wyszukany w Google)","dokladna data emisji","grupa zawodowa/spoleczna","imie i nazwisko gosci")->opis
+
+colnames(daily_show_guests)->kolumny
+
+daily_show_guests %>% filter(group%in%"Musician") %>% group_by(google_knowledge_occupation) %>% summarize(liczba=n()) %>% arrange(desc(liczba)) %>% head(5) -> muzycy
+
+muzycy$google_knowledge_occupation<-c("Pisarz piosenek","Wokalista","Muzyk","Banda rockowa","raper")
+
+
+```
+# Wprowadzenie
+
+Celem projektu jest analiza danych daily_show_guests z pakietu fivethirtyeight.
+
+
+
+
+
+# Analiza danych liczbowych - podsumowanie
+
+
+```{r,echo=FALSE,warning=FALSE}
+
+
+knitr::kable(daily_show_guests %>% select((show),year) %>% summary)
+
+
+
+
+
+
+```
+
+## Opis zmiennych
+
+```{r,echo=FALSE,warning=FALSE}
+
+
+knitr::kable(data.frame(kolumny,opis))
+
+
+
+```
+
+
+# Analiza danych
+
+* Analiza czestosci odwiedzin
+* Szukanie informacji o 3 ostatnich Prezydentach USA
+* Analiza grup zawodowych i medialnych
+
+
+## Liczby osób z poszczególnych zawodów - ogólem
+
+```{r,echo=FALSE,warning=FALSE}
+
+knitr::kable(head(sort(table(daily_show_guests$google_knowledge_occupation),decreasing = TRUE),10),col.names = c("zawod","liczba"),align = "lccrr")
+
+
+```
+
+Tabela przedstawia udzial sumaryczny poszczegolnych zawodów w programie Daily Show Guest. Jak na program codzienny przystalo, najwieksza liczbe stanowia aktorzy i aktorki - czyli w kulturze amerykanskiej celebryci.
+
+
+## Kiedy w programie pojawiali sie trzej ostatni prezydenci: kiedy to bylo, kim byli.
+
+```{r,echo=FALSE,warning=FALSE}
+
+
+knitr::kable(daily_show_guests %>% filter(grepl("Barack Obama",raw_guest_list)|grepl("Biden",raw_guest_list)|grepl("Trump",raw_guest_list)|grepl("Bush",raw_guest_list)) %>% select(show,raw_guest_list,google_knowledge_occupation),align = "lccrr",col.names = c("Data","Imie i nazwisko","Zawód"))
+
+
+
+```
+
+
+
+Jak możemy zauważyc - byli Prezydenci Stanów Zjednoczonych pojawili sie pierwszy raz w programie jako "nieprezydenci" *Joe Biden* w 2004 byl senatorem, w tym samym roku pojawil sie Donald Trump, ktory byl makroprzedsiebiorca, a Barack Obama pojawil sie pierwszy raz w 2005 roku. Obecny prezydent z ramienia Demokratów unika widocznie wywiadów jako wiceprezydent podczas swojej pierwszej kadencji. 
+
+
+
+### Ilu polityków wzielo udzial w programie w poszczegolnych latach?
+
+```{r,echo=FALSE,warning=FALSE}
+
+
+daily_show_guests %>% filter(grepl("president",google_knowledge_occupation)|grepl("politician",google_knowledge_occupation)|grepl("us senator",google_knowledge_occupation)) %>% group_by(year) %>% summarise(liczba=n()) %>% ggplot(aes(x=year,y=liczba))+ geom_col(aes(fill=year%in%c(2000,2004,2008,2012)))+theme_classic()+labs(title="Wykres przedstawiajacy liczbe politykow w programie",subtitle="Kolorem niebieskim oznaczono kolumny, w latach, w ktorych odbywaly sie \n Wybory Prezydenckie")+ theme(legend.title = element_blank(),legend.position = "none")+xlab("lata")+ylab("Liczba uczestnikow programu")
+
+
+
+```
+
+Wybory w Stanach Zjednoczonych zawsze byly goracym tematem. Powyzszy wykres przedstawia ilosc senatorow, prezydentow(także zza granicy) i innych politykow w programie. Kolorem niebieskim oznaczono lata wyborow prezydenckich. Na pierwszy rzut oka nie widac różnicy w liczebnosci przedstawionej w kolumnach. Jednak patrzac na lata nastepujace po wyborach i przed - to wlasnie w latach wyborczych najwiecej polityków uczestniczylo w programie *Daily Show Guests*
+
+## Liczba odwiedzin osob z poszczegolnych grup zawodowych - wykres kolumnowy.
+
+```{r,echo=FALSE,warning=FALSE}
+
+(daily_show_guests %>% ggplot(aes(group))+geom_bar(fill="lightblue4",alpha=0.4)+theme_classic()+coord_flip()+xlab("Grupa")+ylab("liczba odwiedzin"))
+
+
+
+```
+
+Jak możemy zauważyc - najwiecej grup zawodowych wsrod uczestnikow to "media" oraz "acting" co wynika niejako z informacyjnego charakteru programu.
+
+## Jakie grupy zawodowe/spoleczne uczestniczyly w programie za prezydentruy Barack'a Obamy? 
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+ daily_show_guests %>%  filter(group%in%c("Acting","Media","Politician"),year%in%seq(2009,2015,1)) %>% group_by(group,year) %>% summarize(liczba=n()) %>% ggplot(aes(group,liczba)) + geom_col(aes(fill=factor(year)))+scale_fill_viridis_d()+theme(legend.title = element_blank())+xlab("Grupa zawodowa")+labs(title="Liczba gosci z poszczegolnych grup zawodowych z podzialem na rok",subtitle = "prezyentura Barack'a Obamy")
+
+
+
+```
+
+Wzgledem poprzedniego wykresu zmienilo sie niewiele - oprocz roku 2009 ktory byl pierwszym rokiem urzedowania Barack'a Obamy na stanowisku Prezydenta USA, wtedy goscie z grupy *Politician* "przescigneli" gosci z grupy *Acting*
+
+## Analiza czestosci poszczegolnych gosci
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+daily_show_guests %>% count(raw_guest_list) %>% group_by(raw_guest_list) %>% arrange(desc(n)) %>% head(10) %>% ggplot(aes(raw_guest_list,n))+geom_line(aes(fill=raw_guest_list),fill=NA)+coord_flip()+geom_text(aes(label=n),vjust=0.2,size=4.2)+xlab("gosc")+ylab("liczba odwiedzin w programie")+ggtitle("Liczba najczestszych gosci w programie",subtitle = "W latach 1999-2015")+ylim(c(0,20))+theme_minimal()+theme(legend.position = "none")+scale_color_brewer()+theme_light()
+
+
+
+```
+
+W przypadku niektórych możemy powiedziec, ze sa stalymi goscmi programu. Taka osoba jest rekordzista pod wzgledem odwiedzin w programie - Fareed Zakaria - dziennikarz, specjalista do spraw mediow, politolog i wydawca Newsweek'a. 
+
+## Kiedy w programie nie bylo gosci? jaki byl tego powod/temat programu?
+
+```{r,echo=FALSE,warning=FALSE}
+
+knitr::kable(daily_show_guests[which(is.na(daily_show_guests$google_knowledge_occupation)),c(3,5)],col.names = c("data","temat programu"),align = "lcccr")
+
+
+
+```
+W przypadku waznych wydarzen - rozpoczecia interwencji zbrojnej, wydarzen rocznicowych do programu nie zapraszano gosci, a tematem byly biezace wydarzenia.
+
+## Jacy raperzy wystapili w programie?
+
+```{r,echo=FALSE,warning=FALSE}
+knitr::kable(rap[,c(5,3)],col.names = c("imie i nazwisko","data"))
+
+
+```
+
+Pierwszym raperem, który goscil w programie byl LL Cool J - do odwiedzin doszlo dnia 24 sierpnia 1988 roku, do ostatnich odwiedzin osób o zawodzie rapera doszlo 17. listopada 2010, byl to Jay-Z	
+
+
+###  jak wyglada rozklad zawodow z grupy *musician*?
+
+
+```{r,echo=FALSE,warning=FALSE}
+knitr::kable(muzycy,col.names = c("zawód z grupy musician","liczba odwiedzin"))
+
+```
+
+Mimo dużej popularnosci muzyki z gatunku *rap*, wsrod osob bedacych muzykami, to ich wykonawcy nie stanowia wiekszosci wsrod zawodow z grupy *musician*
+
+
+
+
+
+## Analiza miesiecy i dni
+
+```{r,echo=FALSE,warning=FALSE}
+
+knitr::kable(miesiace)
+
+
+```
+Najczestszymi wystepami w analizowanej bazie danych może "pochwalic" sie miesiac Styczeń - wtedy tocza sie rozmowy o planach na Nowy Rok, zarowno w polityce jak i w dziennikarstwie czy innych mediach. 
+
+# Podsumowanie analizy
+1. Analiza liczby politykow w programie wykazuje zwiekszona liczebnosc politykow podczas lat wyborczych.
+2. Dwaj z ostatnich prezydentów USA bylo politykami, natomiast jeden z nich byl przedsiebiorca.
+3. Raperzy nie sa czestymi goscmi programu. 
+4. Do programu najczesciej zapraszani sa ludzie zwiazani z mediami, w tym specjalisci. 
+5. Najwiecej debat rozgrywa sie w styczniu.
+
+# Co można jeszcze zrobic?
+
+* Sprawdzic czy jakies osoby nie zmienily zawodu. 
+* analize dni tygodnia
+* podobne do ww. analiz za prezydentury Georg'a Bush'a
+* Analiza osob z poszczegolnych grup/zawodow inna niż ww. 
+
+## Źródla danych oraz bibliografia:
+ 
+* https://en.wikipedia.org/wiki/The_Daily_Show
+* http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf
+* https://ggplot2-book.org/
+
